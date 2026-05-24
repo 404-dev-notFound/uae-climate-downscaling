@@ -162,17 +162,6 @@ class UHIFuzzyAdjuster:
         rr, cc = np.meshgrid(rows, cols, indexing='ij')
         return np.sqrt((rr - core_idx[0])**2 + (cc - core_idx[1])**2)
 
-    # ─── LEGACY: TEMPERATURE-ONLY (backward compatible) ───
-    def adjust_temperature_grid(self, temp_grid, core_idx=(12, 10)):
-        """Applies ONLY thermal UHI adjustment to a 17x17 temperature grid."""
-        dist_matrix = self.compute_distance_matrix(temp_grid.shape[0], core_idx)
-        t_clipped = np.clip(temp_grid, 10, 55)
-        d_clipped = np.clip(dist_matrix, 0, 24)
-        
-        pts = np.stack([t_clipped.ravel(), d_clipped.ravel()], axis=-1)
-        adj = self._thermal_interp(pts).reshape(temp_grid.shape)
-        return temp_grid + adj
-
     # ─── FULL MULTI-VARIABLE (VECTORIZED) ─────────────────
     def adjust_full_grid(self, grid_5ch, core_idx=(12, 10)):
         """

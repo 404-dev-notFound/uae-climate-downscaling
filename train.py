@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 from models import CNNLSTM_Downscaler
 from data_loader import get_dataloaders
 import os
@@ -19,6 +20,13 @@ def train_model(gcm_path, era5_path, gcm_name='GCM', epochs=50, batch_size=8, lr
         seq_length (int): Sliding window length in days.
         patience (int): Early stopping patience (epochs without improvement).
     """
+    # Reproducibility: set deterministic seeds for consistent results across runs
+    torch.manual_seed(42)
+    np.random.seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(42)
+        torch.backends.cudnn.deterministic = True
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using compute device: {device}")
     

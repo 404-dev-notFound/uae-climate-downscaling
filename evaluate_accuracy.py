@@ -75,12 +75,6 @@ era5_temp = era5_sub[:, idx_t, :, :]
 raw_temp = raw_ml_sub[:, idx_t, :, :]
 fuzzy_temp = fuzzy_ml_sub[:, idx_t, :, :]
 
-# extract Precipitation (Index 1)
-idx_p = FEATURES.index('PCP')
-era5_pcp = era5_sub[:, idx_p, :, :]
-raw_pcp = raw_ml_sub[:, idx_p, :, :]
-fuzzy_pcp = fuzzy_ml_sub[:, idx_p, :, :]
-
 
 # ─── 3. STATISTICAL EVALUATION & PLOTTING ──────────────────────────────────
 print("\n[3/3] Running Statistical Evaluations...")

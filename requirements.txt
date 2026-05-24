@@ -12,7 +12,14 @@ scikit-fuzzy>=0.4.2
 pymannkendall>=1.4.3
 matplotlib>=3.7.0
 
+# Scientific Computing & Interpolation
+scipy>=1.10.0
+
+# Visualization
+seaborn>=0.12.0
+
 # ERA5 / Copernicus Data Fetching
 cdsapi>=0.6.1
 xarray>=2023.0.0
 netCDF4>=1.6.0  # Required by xarray to open ERA5 .nc files
+

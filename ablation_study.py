@@ -91,11 +91,15 @@ def bias(pred, truth):
     return float(np.nanmean(pred - truth))
 
 def r_squared(pred, truth):
+    """True coefficient of determination: 1 - SS_res / SS_tot.
+    Unlike correlation², this accounts for bias in the predictions."""
     p = pred.ravel();  t = truth.ravel()
     mask = ~(np.isnan(p) | np.isnan(t))
     if mask.sum() < 2: return np.nan
-    corr = np.corrcoef(p[mask], t[mask])[0, 1]
-    return float(corr ** 2)
+    ss_res = np.sum((t[mask] - p[mask]) ** 2)
+    ss_tot = np.sum((t[mask] - np.mean(t[mask])) ** 2)
+    if ss_tot == 0: return np.nan
+    return float(1 - ss_res / ss_tot)
 
 def peak_error(pred, truth, q=0.95):
     return float(np.nanquantile(np.abs(pred - truth), q))
@@ -165,6 +169,23 @@ rows = []
 for feat in FEATURES:
     rows.append(metrics_raw[feat]); rows.append(metrics_fuzzy[feat])
 pd.DataFrame(rows).to_csv(os.path.join(OUT_DIR, 'ablation_metrics_table.csv'), index=False)
+
+# ─── STATISTICAL SIGNIFICANCE: WILCOXON SIGNED-RANK TEST ─────────────────────
+# Proves the Fuzzy vs Raw improvement is statistically significant, not just numerically different.
+print("\n  Statistical Significance Tests (Wilcoxon Signed-Rank):")
+print(f"  {'Feature':<8} {'Metric':<10} {'p-value':>10} {'Significant':>12}")
+print(f"  {'-'*8} {'-'*10} {'-'*10} {'-'*12}")
+for ci, feat in enumerate(FEATURES):
+    # Per-pixel, per-timestep absolute errors
+    err_raw  = np.abs(raw_sub[:, ci, :, :] - era5_sub[:, ci, :, :]).ravel()
+    err_fuz  = np.abs(fuzzy_sub[:, ci, :, :] - era5_sub[:, ci, :, :]).ravel()
+    # Wilcoxon test: are the paired error distributions significantly different?
+    try:
+        stat, p_val = stats.wilcoxon(err_raw, err_fuz, alternative='two-sided')
+        sig = 'YES (p<0.05)' if p_val < 0.05 else 'NO'
+        print(f"  {feat:<8} {'MAE':<10} {p_val:>10.2e} {sig:>12}")
+    except ValueError:
+        print(f"  {feat:<8} {'MAE':<10} {'N/A':>10} {'IDENTICAL':>12}")
 
 # ─── STEP 4: VISUALISATIONS (WITH FIXES) ───────────────────────────────────────
 PALETTE = {'raw': '#4A90D9', 'fuzzy': '#E8643A', 'era5': '#2C2C2C', 'delta': '#27AE60'}
