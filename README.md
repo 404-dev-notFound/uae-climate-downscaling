@@ -155,13 +155,6 @@ Under SSP5-8.5, the model projects warming rates of 0.018°C/yr (2015-2044) acce
 - Wind speed R² is negative because the fuzzy engine applies aggressive surface roughness corrections over urban areas, which trades pixel-level accuracy for physical realism.
 - The model adapts to different GCM input resolutions automatically. MIROC6 (3×3) uses the ConvTranspose2d path directly; MPI-ESM (2×2) adds a lightweight bilinear resize to match the 17×17 target.
 
-## Team
-
-- Dev Dahiya — Model architecture and training pipeline
-- Koti — Dataset preparation and GCM preprocessing
-- Adi — Fuzzy logic UHI physics engine
-- Sid — Ablation study and statistical analysis
-- Karthik — Evaluation, baseline comparisons, and results
 
 ## License
 
