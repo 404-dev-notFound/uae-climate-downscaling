@@ -67,6 +67,15 @@ def run_inference(dataset, model, device, means, stds):
             output = model(batch)
             last_frames = output[:, -1, :, :, :].cpu().numpy()
             denorm_batch = last_frames * (stds + 1e-8) + means
+            
+            # Reverse log transform for PCP (applied during data loading)
+            denorm_batch[:, 1, :, :] = np.expm1(denorm_batch[:, 1, :, :])
+            
+            # Enforce strict physical bounds
+            denorm_batch[:, 1, :, :] = np.maximum(denorm_batch[:, 1, :, :], 0.0)    # PCP >= 0
+            denorm_batch[:, 3, :, :] = np.clip(denorm_batch[:, 3, :, :], 0.0, 100.0) # RH 0-100%
+            denorm_batch[:, 4, :, :] = np.maximum(denorm_batch[:, 4, :, :], 0.0)    # WS >= 0
+            
             all_predictions.append(denorm_batch)
             processed += len(batch)
             if processed % 5000 < BATCH_SIZE:

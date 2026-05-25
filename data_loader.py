@@ -92,10 +92,18 @@ class ClimateDataset(Dataset):
         """Compute mean and std for each feature channel from the raw data."""
         stats = {'x': {}, 'y': {}}
         for feat in self.features:
-            stats['x'][feat] = (float(self.df_x[feat].mean()), float(self.df_x[feat].std()))
+            if feat == 'PCP':
+                vals_x = np.log1p(np.maximum(self.df_x[feat].values, 0.0))
+                stats['x'][feat] = (float(np.mean(vals_x)), float(np.std(vals_x)))
+            else:
+                stats['x'][feat] = (float(self.df_x[feat].mean()), float(self.df_x[feat].std()))
         if self.df_y is not None:
             for feat in self.features:
-                stats['y'][feat] = (float(self.df_y[feat].mean()), float(self.df_y[feat].std()))
+                if feat == 'PCP':
+                    vals_y = np.log1p(np.maximum(self.df_y[feat].values, 0.0))
+                    stats['y'][feat] = (float(np.mean(vals_y)), float(np.std(vals_y)))
+                else:
+                    stats['y'][feat] = (float(self.df_y[feat].mean()), float(self.df_y[feat].std()))
         return stats
     
     def _save_norm_stats(self, path):
@@ -122,6 +130,11 @@ class ClimateDataset(Dataset):
             spatial_tensor = []
             for i, feat in enumerate(self.features):
                 mat = group[feat].values.reshape(h, w)
+                
+                # NEW: Log-transform highly skewed variables BEFORE Z-score
+                if feat == 'PCP':
+                    mat = np.log1p(np.maximum(mat, 0.0))
+                    
                 # Z-Score normalization: (value - mean) / std
                 mean, std = self.norm_stats[stats_key][feat]
                 mat = (mat - mean) / (std + 1e-8)  # epsilon to prevent division by zero

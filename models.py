@@ -39,6 +39,20 @@ class CNNLSTM_Downscaler(nn.Module):
     def __init__(self, in_channels=5, hidden_channels=64, out_channels=5):
         super(CNNLSTM_Downscaler, self).__init__()
         
+        # ---- Learnable Spatial Upsampling (3x3 -> 17x17) ----
+        # Stage 1: 3x3 -> 9x9 via ConvTranspose2d (stride=3, kernel=3)
+        self.upsample_stage1 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, hidden_channels, kernel_size=3, stride=3, padding=0),
+            nn.BatchNorm2d(hidden_channels),
+            nn.ReLU(inplace=True)
+        )
+        # Stage 2: 9x9 -> 17x17 via ConvTranspose2d (stride=2, kernel=3, output_padding=0)
+        self.upsample_stage2 = nn.Sequential(
+            nn.ConvTranspose2d(hidden_channels, in_channels, kernel_size=3, stride=2, padding=1, output_padding=0),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True)
+        )
+        
         # Deeper Spatial Feature Extraction with BatchNorm for stable training
         self.feature_conv1 = nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(hidden_channels)
@@ -81,8 +95,14 @@ class CNNLSTM_Downscaler(nn.Module):
         for t in range(T):
             x_t = x[:, t, :, :, :] # (B, C, 3, 3)
             
-            # Step 2: Spatial Upsampling using Bicubic Interpolation
-            x_up = F.interpolate(x_t, size=(target_h, target_w), mode='bicubic', align_corners=False)
+            # Step 2: Learnable Spatial Upsampling via Transposed Convolutions
+            # Stage 1: HxW -> intermediate, Stage 2: intermediate -> near-target
+            x_up = self.upsample_stage1(x_t)
+            x_up = self.upsample_stage2(x_up)
+            
+            # Adaptive resize: guarantee exactly 17x17 for any input grid (2x2, 3x3, etc.)
+            if x_up.shape[2] != target_h or x_up.shape[3] != target_w:
+                x_up = F.interpolate(x_up, size=(target_h, target_w), mode='bilinear', align_corners=False)
             
             # Step 3: Deeper Feature Extraction with Residual Connection
             identity = self.residual_proj(x_up)       # (B, hidden, 17, 17)

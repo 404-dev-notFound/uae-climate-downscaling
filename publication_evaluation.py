@@ -124,47 +124,101 @@ print(df_metrics.to_string(index=False))
 
 # ─── 4. TAYLOR DIAGRAM ─────────────────────────────────────────────────────
 print("\n[4/6] Generating Taylor Diagram...")
-fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+from matplotlib.lines import Line2D
+
+fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={'projection': 'polar'})
+
+# Restrict to first quadrant (correlation 0..1 maps to 90deg..0deg)
 ax.set_thetamin(0)
 ax.set_thetamax(90)
 
-# Correlation ticks
+# Radial axis: Normalized Standard Deviation, strictly 0 to 1.5 at 0.25 intervals
+ax.set_rmax(1.5)
+ax.set_rticks(np.arange(0, 1.75, 0.25))
+ax.set_rlabel_position(22.5)
+
+# Angular axis: Correlation coefficient ticks
 corr_ticks = [0.0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0]
 angles = np.arccos(corr_ticks)
 ax.set_xticks(angles)
-ax.set_xticklabels([str(c) for c in corr_ticks])
-ax.set_title("Taylor Diagram: CNN-LSTM vs ERA5 (2015-2025)", y=1.08)
+ax.set_xticklabels([str(c) for c in corr_ticks], fontsize=10)
 
-# CRMSE contours
-rs, ts = np.meshgrid(np.linspace(0, 2.5, 100), np.linspace(0, np.pi/2, 100))
-crmse = np.sqrt(1 + rs**2 - 2*rs*np.cos(ts))
-contours = ax.contour(ts, rs, crmse, levels=[0.25, 0.5, 0.75, 1.0, 1.5], colors='gray', linestyles='dashed', alpha=0.5)
-ax.clabel(contours, inline=True, fontsize=8, fmt='%.2f')
+# Clear gridlines
+ax.grid(True, linestyle='-', alpha=0.3, linewidth=0.8)
+ax.set_axisbelow(True)
 
-# Reference point
-ax.plot(0, 1, 'k*', markersize=15, label='ERA5 Reference')
+# Title
+ax.set_title("Taylor Diagram: CNN-LSTM vs ERA5 (2015-2025)", y=1.10, fontsize=14, fontweight='bold')
 
-colors = ['red', 'blue', 'green', 'purple', 'orange']
+# ---- Centered RMSE Contours (Law of Cosines from ref point r=1, theta=0) ----
+crmse_levels = [0.25, 0.5, 0.75, 1.0, 1.25]
+theta_fine = np.linspace(0, np.pi/2, 200)
+
+for crmse_val in crmse_levels:
+    r_contour = []
+    t_contour = []
+    for th in theta_fine:
+        a_coeff = 1.0
+        b_coeff = -2.0 * np.cos(th)
+        c_coeff = 1.0 - crmse_val**2
+        discriminant = b_coeff**2 - 4 * a_coeff * c_coeff
+        if discriminant < 0:
+            continue
+        r1 = (-b_coeff + np.sqrt(discriminant)) / (2 * a_coeff)
+        r2 = (-b_coeff - np.sqrt(discriminant)) / (2 * a_coeff)
+        for r_candidate in [r1, r2]:
+            if 0 <= r_candidate <= 1.5:
+                r_contour.append(r_candidate)
+                t_contour.append(th)
+
+    if len(t_contour) > 0:
+        ax.plot(t_contour, r_contour, '--', color='#4a90d9', alpha=0.6, linewidth=1.2)
+        mid_idx = len(t_contour) // 2
+        ax.annotate(f'{crmse_val:.2f}', xy=(t_contour[mid_idx], r_contour[mid_idx]),
+                    fontsize=8, color='#4a90d9', fontweight='bold',
+                    ha='center', va='bottom')
+
+# ERA5 Reference Point
+ax.plot(0, 1, 'k*', markersize=18, zorder=10)
+
+# ---- Plot Data Points ----
+var_colors = {'T_avg': '#E74C3C', 'PCP': '#3498DB', 'AP': '#27AE60', 'RH': '#8E44AD', 'WS': '#E67E22'}
+
 for ci, feat in enumerate(FEATURES):
     e_flat = era5_sub[:, ci, :, :].ravel()
     for variant, p_sub, marker in [('Raw', raw_sub, 'o'), ('Fuzzy', fuzzy_sub, '^')]:
         p_flat = p_sub[:, ci, :, :].ravel()
         std_ratio = np.std(p_flat) / np.std(e_flat)
         corr = np.corrcoef(e_flat, p_flat)[0, 1]
-        theta = np.arccos(np.clip(corr, 0, 1))
-        ax.plot(theta, std_ratio, marker=marker, color=colors[ci], linestyle='', markersize=10, 
-                label=f'{feat} ({variant})' if ci == 0 else f'_{feat} ({variant})')
+        theta = np.arccos(np.clip(corr, -1, 1))
+        ax.plot(theta, std_ratio, marker=marker, color=var_colors[feat],
+                linestyle='', markersize=11, markeredgecolor='black',
+                markeredgewidth=0.8, zorder=5)
 
-# Add legend elements manually for cleanliness
-from matplotlib.lines import Line2D
-legend_elements = [Line2D([0], [0], marker='*', color='k', linestyle='None', markersize=10, label='ERA5 Reference')]
-for ci, feat in enumerate(FEATURES):
-    legend_elements.append(Line2D([0], [0], marker='s', color=colors[ci], linestyle='None', markersize=8, label=feat))
-legend_elements.append(Line2D([0], [0], marker='o', color='gray', linestyle='None', markersize=8, label='Raw'))
-legend_elements.append(Line2D([0], [0], marker='^', color='gray', linestyle='None', markersize=8, label='Fuzzy'))
+# ---- Legend ----
+legend_elements = [
+    Line2D([0], [0], marker='*', color='k', linestyle='None', markersize=14, label='ERA5 Reference')
+]
+for feat in FEATURES:
+    legend_elements.append(
+        Line2D([0], [0], marker='s', color=var_colors[feat], linestyle='None',
+               markersize=9, markeredgecolor='black', markeredgewidth=0.5, label=feat)
+    )
+legend_elements.append(Line2D([0], [0], marker='o', color='gray', linestyle='None',
+                               markersize=9, markeredgecolor='black', markeredgewidth=0.5, label='Raw CNN-LSTM'))
+legend_elements.append(Line2D([0], [0], marker='^', color='gray', linestyle='None',
+                               markersize=9, markeredgecolor='black', markeredgewidth=0.5, label='Fuzzy-Adjusted'))
+legend_elements.append(Line2D([0], [0], linestyle='--', color='#4a90d9', alpha=0.6, label='Centered RMSE'))
 
-ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.35, 1.05))
-plt.savefig('evaluation/publication/taylor_diagram.png', dpi=150, bbox_inches='tight')
+ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.42, 1.08),
+          fontsize=9, framealpha=0.9, edgecolor='gray')
+
+# Axis Labels (preserving polar geometry - no Cartesian Y-axis)
+fig.text(0.50, 0.03, 'Normalized Standard Deviation (model / ERA5)', ha='center', fontsize=12, fontweight='bold')
+fig.text(0.82, 0.82, 'Correlation', ha='center', rotation=-45, fontsize=11, fontweight='bold', color='#333')
+
+plt.subplots_adjust(bottom=0.12, left=0.10, right=0.82, top=0.88)
+plt.savefig('evaluation/publication/taylor_diagram.png', dpi=150, bbox_inches='tight', pad_inches=0.3)
 plt.close()
 
 # ─── 5. PER-PIXEL R2 MAPS ──────────────────────────────────────────────────

@@ -20,8 +20,8 @@ from fuzzy_uhi import UHIFuzzyAdjuster
 from statistical_analysis import ClimateTrendAnalyzer
 
 # ─── CONFIG ───────────────────────────────────────────────
-MODEL_PATH     = "best_downscaler_model.pth"
-NORM_STATS     = "norm_stats.json"
+MODEL_PATH     = "best_downscaler_MIROC6.pth"
+NORM_STATS     = "MIROC6_norm_stats.json"
 MIROC6_PATH    = "MIROC6_UAE_Spatial_Input_1950_2014.csv"
 RESULTS_DIR    = "results"
 SEQ_LENGTH     = 14
@@ -80,6 +80,16 @@ with torch.no_grad():
         output = model(batch)
         last_frames = output[:, -1, :, :, :].cpu().numpy()
         denorm_batch = last_frames * (stds + 1e-8) + means
+        
+        # NEW: Physical bounds enforcement
+        # Reverse log transform for PCP
+        denorm_batch[:, 1, :, :] = np.expm1(denorm_batch[:, 1, :, :])
+        
+        # Enforce strict physical bounds for Moisture and Friction
+        denorm_batch[:, 1, :, :] = np.maximum(denorm_batch[:, 1, :, :], 0.0)    # PCP >= 0
+        denorm_batch[:, 3, :, :] = np.clip(denorm_batch[:, 3, :, :], 0.0, 100.0) # RH 0-100%
+        denorm_batch[:, 4, :, :] = np.maximum(denorm_batch[:, 4, :, :], 0.0)    # WS >= 0
+        
         all_predictions.append(denorm_batch)
         processed += len(batch)
         if processed % 5000 < BATCH_SIZE:

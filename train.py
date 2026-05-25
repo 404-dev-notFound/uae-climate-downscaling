@@ -52,8 +52,11 @@ def train_model(gcm_path, era5_path, gcm_name='GCM', epochs=50, batch_size=8, lr
     # 3. Loss & Optimizer
     # HuberLoss is ideal for climate arrays as it penalizes extreme outliers less aggressively than MSE, 
     # preventing unstable gradients from sudden storm/extreme heat pixels.
-    criterion = nn.HuberLoss()
+    criterion = nn.HuberLoss(reduction='none')
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    
+    # Define physical priority weights: [T_avg, PCP, AP, RH, WS]
+    channel_weights = torch.tensor([1.0, 5.0, 1.0, 1.5, 2.0], device=device)
     
     # Learning Rate Scheduler: halves LR when val loss plateaus for 3 epochs
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
@@ -73,8 +76,12 @@ def train_model(gcm_path, era5_path, gcm_name='GCM', epochs=50, batch_size=8, lr
             # outputs shape: (Batch, Seq_Len, 5, 17, 17)
             outputs = model(x)
             
-            # Compute loss over the entire spatiotemporal output sequence
-            loss = criterion(outputs, y)
+            # Compute loss per pixel, then apply channel weights
+            raw_loss = criterion(outputs, y)
+            weighted_loss = raw_loss * channel_weights.view(1, 1, 5, 1, 1)
+            
+            # Average the weighted loss to get the final scalar
+            loss = weighted_loss.mean()
             
             loss.backward()
             # Gradient clipping prevents exploding gradients with normalized features
@@ -91,7 +98,9 @@ def train_model(gcm_path, era5_path, gcm_name='GCM', epochs=50, batch_size=8, lr
             for x, y in val_loader:
                 x, y = x.to(device), y.to(device)
                 outputs = model(x)
-                loss = criterion(outputs, y)
+                raw_loss = criterion(outputs, y)
+                weighted_loss = raw_loss * channel_weights.view(1, 1, 5, 1, 1)
+                loss = weighted_loss.mean()
                 val_loss += loss.item()
                 
         avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0
@@ -132,10 +141,10 @@ if __name__ == "__main__":
     print("=" * 60)
 
     for gcm_name, gcm_path in GCM_CONFIGS.items():
-        print(f"\n{'─' * 60}")
+        print(f"\n{'-' * 60}")
         print(f"  Training downscaler for: {gcm_name}")
         print(f"  Input: {gcm_path}")
-        print(f"{'─' * 60}")
+        print(f"{'-' * 60}")
 
         if not os.path.exists(gcm_path):
             print(f"  SKIP: {gcm_path} not found. Run the {gcm_name} fetch script first.")

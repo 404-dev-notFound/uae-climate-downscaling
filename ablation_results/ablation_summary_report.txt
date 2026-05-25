@@ -1,0 +1,8 @@
+Ablation Study Summary
+Generated: 2026-05-25 23:24:48.171109
+
+T_avg: Raw MAE=1.732, Fuzzy MAE=1.672
+PCP: Raw MAE=0.177, Fuzzy MAE=0.177
+AP: Raw MAE=2.095, Fuzzy MAE=2.095
+RH: Raw MAE=7.954, Fuzzy MAE=8.761
+WS: Raw MAE=1.210, Fuzzy MAE=1.304
