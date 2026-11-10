@@ -4,6 +4,10 @@ A deep learning pipeline for downscaling coarse Global Climate Model (GCM) outpu
 
 This project was developed as part of our undergraduate thesis at Birla Institute of Technology and Science (BITS Pilani, Dubai Campus).
 
+> 📄 **Paper:** *High-Resolution Climate Downscaling and Urban Heat Dynamics under CMIP6 Scenarios in Arid Regions*, first author Dev Dahiya, **under review** at the *International Journal of Climatology*.
+
+**Headline results (unseen 2015–2025 window):** temperature R² 0.88 and pressure R² 0.96, with 74–78% lower error than bilinear interpolation on temperature, pressure and humidity; the fuzzy UHI layer cut Dubai urban-core temperature error by 72.5%.
+
 ---
 
 ## What does this project do?
